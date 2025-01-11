@@ -140,9 +140,8 @@ jobs:
         # "jobs" context is used for re-usable workflows only, NOT for here.
         # Where as "needs" context is for aborbing job outputs of all jobs mentioned in "needs" key above
         run: echo "hello finame=${{ needs.build.outputs.my_output_key_name }}"
-
       - name: Deploy Code
-        run: echo |
-          "Here we should access the exported artifacts in build job"
-          "Most of the web hosting providers must have had their own actions, to accept"
-          "artifcats files to deploy in them"
+        run: |
+          echo "Here we should access the exported artifacts in build job"
+          echo "Most of the web hosting providers must have had their own actions, to accept"
+          echo "artifact files to deploy in them"

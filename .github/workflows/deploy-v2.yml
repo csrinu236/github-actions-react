@@ -120,7 +120,7 @@ jobs:
       - name: Output files
         run: ls # inspecting artifacts files
       - name: Deploy Code
-        run: echo |
-          "Here we should access the exported artifacts in build job"
-          "Most of the web hosting providers must have had their own actions, to accept"
-          "artifcats files to deploy in them"
+        run: |
+          echo "Here we should access the exported artifacts in build job"
+          echo "Most of the web hosting providers must have had their own actions, to accept"
+          echo "artifcats files to deploy in them"
