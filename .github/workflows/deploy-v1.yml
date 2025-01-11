@@ -23,7 +23,8 @@ on:
     # paths: It means workflow will be triggered only if src/components files change.
     #   - 'src/component/*'
     paths-ignore:
-      - '.github/workflows/*' # It means workflow won't be triggered for these file changes
+      # - '.github/workflows/*'
+      # It means workflow won't be triggered for these file changes
       - .gitignore
 jobs:
   lint:
