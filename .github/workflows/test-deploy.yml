@@ -1,5 +1,7 @@
 name: Test & Deploy Project
-on: push
+# push is for running worflow when push happens, workflow_dispatch is for
+# manual running of workflow.
+on: [push, workflow_dispatch]
 jobs:
   test:
     runs-on: ubuntu-20.04
@@ -21,7 +23,8 @@ jobs:
         run: npm test
   deploy:
     # deploy should run only after test job is successfull
-    needs: test # we should give job name of dependent jobs, ex: [test, job2]
+    # we should give job name of dependent jobs, ex: [test, job2]
+    needs: test # if above job fails, this job wont even start.
     runs-on: ubuntu-20.04
     steps:
       - name: Get the code
