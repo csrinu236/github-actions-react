@@ -99,7 +99,7 @@ jobs:
       - name: Build Project
         run: npm run build
       - name: Upload Artifacts
-        uses: actions/upload-artifacts@v3
+        uses: actions/upload-artifact@v3
         with:
           name: my-dist-files
           path: | # "|" is a pipe symbol to enable multi line instructions
