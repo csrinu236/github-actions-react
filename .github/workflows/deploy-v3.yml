@@ -1,4 +1,4 @@
-name: Upload Artifacts
+name: Job Outputs
 # push is for running worflow when push happens, workflow_dispatch is for
 # manual running of workflow.
 # Also we will have more filters for events, say only main branch should trigger deployement.
@@ -82,6 +82,8 @@ jobs:
     # we should give job name of dependent jobs, ex: [test, job2]
     needs: test # if above job fails, this job wont even start.
     runs-on: ubuntu-20.04
+    outputs:
+      my_output_key_name: ${{ steps.publish_output_step.outputs.my_file_key_name }}
     steps:
       - name: Get the code
         # run: action/checkout@v3 , run command is for echo "hhh" (running shell commands)
@@ -97,7 +99,19 @@ jobs:
       - name: Install Dependencies
         run: npm ci
       - name: Build Project
-        run: npm run build
+        run: npm run build # whenever new build is generated, a new index.<unique_hash_id>.js
+      - name: Publish Js Filename # which is unique each time, we want to export this file name
+        # below is linux command to print filename in linux CLI.
+        # print is not enough, we need to export,
+        # {} is place holder for index.49001b93.js same like rust println
+        # run: find dist/assets/*.js -type f -execdir echo '{}' ';'
+        # You are basically setting my_file_key=index.49001b93.js to $GITHUB_OUTPUT as env
+        # variable so that it is available in this entire job environment.
+        # 1st aproach (recommeneded)
+        run: find dist/assets/*.js -type f -execdir echo 'my_file_key_name={}' >> $GITHUB_OUTPUT ';'
+        # 2nd aproach (NOT recommeneded, as it is not supported by github actions in future)
+        # run: find dist/assets/*.js -type f -execdir echo '::set-output my_file_key_name={}' ';'
+        id: publish_output_step
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -117,8 +131,16 @@ jobs:
         with:
           name: my-dist-files # downloads and unzip as well, so these files are available
           # in this runner file system
-      - name: Output files
-        run: ls # inspecting artifacts files
+      - name: Output Dist files
+        # echo ${{ jobs }} context is used for re-usable workflows only
+        run: | # inspecting artifacts files
+          ls
+      - name: Utilising exported outputs
+        # What we need here is "needs" context object, NOT "jobs" context object.
+        # "jobs" context is used for re-usable workflows only, NOT for here.
+        # Where as "needs" context is for aborbing job outputs of all jobs mentioned in "needs" key above
+        run: echo "hello finame=${{ needs.build.outputs.my_output_key_name }}"
+
       - name: Deploy Code
         run: echo |
           "Here we should access the exported artifacts in build job"
