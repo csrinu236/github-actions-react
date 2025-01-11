@@ -1,0 +1,115 @@
+name: Upload Artifacts
+# push is for running worflow when push happens, workflow_dispatch is for
+# manual running of workflow.
+# Also we will have more filters for events, say only main branch should trigger deployement.
+# on: [push, workflow_dispatch, pull_request]
+# you can also do like below if there are no nested feilds like activity types/event filters.
+# on:
+#   - push
+#   - workflow_dispatch
+on:
+  pull_request:
+    # Say, you yourself create a pull request from dev to main branch,
+    # git pull dev into main branch. By default, a workflow only runs when
+    # a pull_request event's activity type is opened, synchronize, or reopened.
+    types: [opened, closed]
+    # For pull requests coming from forked repos(non-collaborators),
+    # Github will wait for your(owner) permission to trigger workflow.
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+      - 'releases/**'
+    # paths: It means workflow will be triggered only if src/components files change.
+    #   - 'src/component/*'
+    paths-ignore:
+      - '.github/workflows/*' # It means workflow won't be triggered for these file changes
+      - .gitignore
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get the code
+
+        # run: action/checkout@v3, run command is for echo "hhh" (for running shell commands)
+        uses: actions/checkout@v3
+        #  with:
+        #  github context supplies everything related to context
+        #  instead of using actions/checkout@v3, we can also use this github context
+        #  data to manually clone the repository.
+        # ${{ github.repository }}
+        #   repository: ""
+        # run: 'echo ${{ toJson(github) }}'
+        # run: 'echo ${{ github.repository }}'
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install Dependencies
+        run: npm ci
+      - name: Lint
+        run: npm lint
+  test:
+    needs: lint
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get the code
+
+        # run: action/checkout@v3, run command is for echo "hhh" (for running shell commands)
+        uses: actions/checkout@v3
+        #  with:
+        #  github context supplies everything related to context
+        #  instead of using actions/checkout@v3, we can also use this github context
+        #  data to manually clone the repository.
+        # ${{ github.repository }}
+        #   repository: ""
+        # run: 'echo ${{ toJson(github) }}'
+        # run: 'echo ${{ github.repository }}'
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install Dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  build:
+    # deploy should run only after test job is successfull
+    # we should give job name of dependent jobs, ex: [test, job2]
+    needs: test # if above job fails, this job wont even start.
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get the code
+        # run: action/checkout@v3 , run command is for echo "hhh" (running shell commands)
+        uses: actions/checkout@v3
+        #  with:
+        #  github context supplies everything related to context
+        # ${{ github.repository }}
+        #   repository: ""
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install Dependencies
+        run: npm ci
+      - name: Build Project
+        run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-artifacts@v3
+        with:
+          name: my-dist-files
+          path: | # "|" is a pipe symbol to enable multi line instructions
+            dist
+            public
+
+  deploy:
+    # deploy should run only after test job is successfull
+    # we should give job name of dependent jobs, ex: [test, job2]
+    needs: build # if above job fails, this job wont even start.
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Deploy Code
+        run: echo "Deploying code"
