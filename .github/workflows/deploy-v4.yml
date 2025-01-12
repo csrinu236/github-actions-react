@@ -1,0 +1,171 @@
+name: Caching node_modules
+# push is for running worflow when push happens, workflow_dispatch is for
+# manual running of workflow.
+# Also we will have more filters for events, say only main branch should trigger deployement.
+# on: [push, workflow_dispatch, pull_request]
+# you can also do like below if there are no nested feilds like activity types/event filters.
+# on:
+#   - push
+#   - workflow_dispatch
+on:
+  pull_request:
+    # Say, you yourself create a pull request from dev to main branch,
+    # git pull dev into main branch. By default, a workflow only runs when
+    # a pull_request event's activity type is opened, synchronize, or reopened.
+    types: [opened, closed]
+    # For pull requests coming from forked repos(non-collaborators),
+    # Github will wait for your(owner) permission to trigger workflow.
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+      - 'releases/**'
+    # paths: It means workflow will be triggered only if src/components files change.
+    #   - 'src/component/*'
+    paths-ignore:
+      # - '.github/workflows/*'
+      # It means workflow won't be triggered for these file changes
+      - .gitignore
+jobs:
+  lint:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get the code
+
+        # run: action/checkout@v3, run command is for echo "hhh" (for running shell commands)
+        uses: actions/checkout@v3
+        #  with:
+        #  github context supplies everything related to context
+        #  instead of using actions/checkout@v3, we can also use this github context
+        #  data to manually clone the repository.
+        # ${{ github.repository }}
+        #   repository: ""
+        # run: 'echo ${{ toJson(github) }}'
+        # run: 'echo ${{ github.repository }}'
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        id: npm-cache # use this to check for `cache-hit` if: steps.npm-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.npm # why this? why not node_modules => CHECK docs in the MARKETPLACE actions/cache@v3
+          # Docs: It is not recommended to cache node_modules, as it can break across Node versions and won't work with npm ci
+          # key: node_modules => NOT best because we should cache again when package-lock.json changes;
+          # we should hold package-lock.json as cache key for this cache
+          # If we have package-lock.json in a nested folders we can proceed like below
+          #   path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: node_modules-${{ hashFiles('**/package-lock.json') }}
+      - name: Install Dependencies
+        run: npm ci # it will take node_modules if found in ~/.npm or it will install
+      - name: Lint
+        run: npm run lint
+  test:
+    needs: lint
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get the code
+
+        # run: action/checkout@v3, run command is for echo "hhh" (for running shell commands)
+        uses: actions/checkout@v3
+        #  with:
+        #  github context supplies everything related to context
+        #  instead of using actions/checkout@v3, we can also use this github context
+        #  data to manually clone the repository.
+        # ${{ github.repository }}
+        #   repository: ""
+        # run: 'echo ${{ toJson(github) }}'
+        # run: 'echo ${{ github.repository }}'
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Cache node_modules # Retreiving cache, check above job for caching details
+        uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ~/.npm
+          key: node_modules-${{ hashFiles('**/package-lock.json') }}
+      - name: Install Dependencies
+        run: npm ci
+      - name: Test
+        run: npm test
+
+  build:
+    # deploy should run only after test job is successfull
+    # we should give job name of dependent jobs, ex: [test, job2]
+    needs: test # if above job fails, this job wont even start.
+    runs-on: ubuntu-20.04
+    outputs:
+      my_output_key_name: ${{ steps.publish_output_step.outputs.my_file_key_name }}
+    steps:
+      - name: Get the code
+        # run: action/checkout@v3 , run command is for echo "hhh" (running shell commands)
+        uses: actions/checkout@v3
+        #  with:
+        #  github context supplies everything related to context
+        # ${{ github.repository }}
+        #   repository: ""
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Cache node_modules # Retreiving cache, check above job for caching details
+        uses: actions/cache@v3
+        id: npm-cache
+        with:
+          path: ~/.npm
+          key: node_modules-${{ hashFiles('**/package-lock.json') }}
+      - name: Install Dependencies
+        run: npm ci
+      - name: Build Project
+        run: npm run build # whenever new build is generated, a new index.<unique_hash_id>.js
+      - name: Publish Js Filename # which is unique each time, we want to export this file name
+        # below is linux command to print filename in linux CLI.
+        # print is not enough, we need to export,
+        # {} is place holder for index.49001b93.js same like rust println
+        # run: find dist/assets/*.js -type f -execdir echo '{}' ';'
+        # You are basically setting my_file_key=index.49001b93.js to $GITHUB_OUTPUT as env
+        # variable so that it is available in this entire job environment.
+        # ${GITHUB_OUTPUT} is a GitHub Actions-specific variable pointing to a file where output values for the current step can be stored. These outputs can then be used in subsequent steps of the workflow.
+        # 1st aproach (recommeneded)
+        run: find dist/assets/*.js -type f -execdir echo 'my_file_key_name={}' >> $GITHUB_OUTPUT ';'
+        # 2nd aproach (NOT recommeneded, as it is not supported by github actions in future)
+        # run: find dist/assets/*.js -type f -execdir echo '::set-output my_file_key_name={}' ';'
+        id: publish_output_step
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: my-dist-files
+          path: | # "|" is a pipe symbol to enable multi line instructions
+            dist
+            public
+
+  deploy:
+    # deploy should run only after test job is successfull
+    # we should give job name of dependent jobs, ex: [test, job2]
+    needs: build # if above job fails, this job wont even start.
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: my-dist-files # downloads and unzip as well, so these files are available
+          # in this runner file system
+      - name: Output Dist files
+        # echo ${{ jobs }} context is used for re-usable workflows only
+        run: | # inspecting artifacts files
+          ls
+      - name: Utilising exported outputs
+        # What we need here is "needs" context object, NOT "jobs" context object.
+        # "jobs" context is used for re-usable workflows only, NOT for here.
+        # Where as "needs" context is for aborbing job outputs of all jobs mentioned in "needs" key above
+        run: echo "hello finame=${{ needs.build.outputs.my_output_key_name }}"
+      - name: Deploy Code
+        run: |
+          echo "Here we should access the exported artifacts in build job"
+          echo "Most of the web hosting providers must have had their own actions, to accept"
+          echo "artifact files to deploy in them"
