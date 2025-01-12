@@ -54,7 +54,8 @@ jobs:
           path: ~/.npm # why this? why not node_modules => CHECK docs in the MARKETPLACE actions/cache@v3
           # Docs: It is not recommended to cache node_modules, as it can break across Node versions and won't work with npm ci
           # key: node_modules => NOT best because we should cache again when package-lock.json changes;
-          # we should hold package-lock.json as cache key for this cache
+          # When a new package is added, we should rely on cache, so we should have package-lock.json as cache key for this cache
+          #
           # If we have package-lock.json in a nested folders we can proceed like below
           #   path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: node_modules-${{ hashFiles('**/package-lock.json') }}
